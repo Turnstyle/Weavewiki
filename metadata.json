@@ -1,0 +1,6 @@
+{
+  "name": "Weavewiki",
+  "description": "Explore a wiki without limits. Every word is a hyperlink to a new definition, generated in real-time by AI. Follow your curiosity down an endless path and discover the surprising connections between any two topics.",
+  "requestFramePermissions": [],
+  "prompt": ""
+}

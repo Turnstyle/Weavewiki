@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Weavewiki</title>
+
+    <!-- Hardening: Content Security Policy to prevent XSS and other attacks -->
+    <meta http-equiv="Content-Security-Policy" content="
+      default-src 'self'; 
+      script-src 'self' https://esm.sh 'unsafe-inline'; 
+      style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; 
+      font-src https://fonts.gstatic.com; 
+      img-src 'self' https://storage.googleapis.com; 
+      connect-src 'self'; 
+      frame-ancestors 'none';
+    ">
+
+    <!-- Open Graph / LinkedIn / General Social Media Meta Tags -->
+    <meta property="og:title" content="Weavewiki: The Infinite AI Wiki" />
+    <meta property="og:description" content="Explore endlessly. Every word opens a new AI-generated article — turning curiosity into an infinite journey." />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="https://storage.googleapis.com/generative-ai-hackathon-2024-demos/weavewiki-og-image.jpg" />
+    <meta property="og:image:secure_url" content="https://storage.googleapis.com/generative-ai-hackathon-2024-demos/weavewiki-og-image.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="627" />
+    
+    <!-- Twitter Card Meta Tags -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Weavewiki: The Infinite AI Wiki" />
+    <meta name="twitter:description" content="Explore endlessly. Every word opens a new AI-generated article — turning curiosity into an infinite journey." />
+    <meta name="twitter:image" content="https://storage.googleapis.com/generative-ai-hackathon-2024-demos/weavewiki-og-image.jpg" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Kosugi&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/index.css">
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@18.2.0",
+    "react/": "https://esm.sh/react@18.2.0/",
+    "react-dom": "https://esm.sh/react-dom@18.2.0",
+    "react-dom/": "https://esm.sh/react-dom@18.2.0/",
+    "@google/genai": "https://esm.sh/@google/genai@1.7.0"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
