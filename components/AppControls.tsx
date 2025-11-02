@@ -81,7 +81,7 @@ const AppControls: React.FC<AppControlsProps> = ({
         {isMindMapView ? 'Content View' : 'Word Cloud'}
       </button>
       
-      {/* <button onClick={handleShare}>{shareText}</button> */}
+      <button onClick={handleShare}>{shareText}</button>
     </div>
   );
 };
