@@ -9,17 +9,15 @@ let ai: GoogleGenAI | null = null;
 
 /**
  * Lazily initializes and returns the GoogleGenAI client.
- * This prevents a fatal error on startup if the constructor fails
- * (e.g., due to a stricter SDK validation on the placeholder API key).
+ * This prevents a fatal error on startup if the constructor fails.
  * Errors in initialization will be caught by the calling function's try/catch block.
  */
 function getAiClient(): GoogleGenAI {
   if (!ai) {
-    // In a client-side browser environment proxied by a service like aistudio/applet-proxy,
-    // the API key is injected by the proxy on the server-side. However, the GenAI SDK
-    // requires a non-empty API key string in its constructor for client-side validation.
-    // We provide a placeholder value which will be replaced by the proxy.
-    ai = new GoogleGenAI({apiKey: 'placeholder'});
+    // The API key is injected by the AI Studio environment and is accessible
+    // via process.env.API_KEY. This is the standard and secure way to
+    // access the key in this proxied, client-side environment.
+    ai = new GoogleGenAI({apiKey: process.env.API_KEY});
   }
   return ai;
 }

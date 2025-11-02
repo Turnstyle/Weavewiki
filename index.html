@@ -9,11 +9,11 @@
     <!-- Hardening: Content Security Policy to prevent XSS and other attacks -->
     <meta http-equiv="Content-Security-Policy" content="
       default-src 'self'; 
-      script-src 'self' https://esm.sh; 
+      script-src 'self' https://esm.sh 'unsafe-inline'; 
       style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; 
       font-src https://fonts.gstatic.com; 
       img-src 'self' https://storage.googleapis.com; 
-      connect-src 'self' https://*.googleapis.com;
+      connect-src 'self' https://*.googleapis.com https://*.googleusercontent.com;
     ">
 
     <!-- Open Graph / LinkedIn / General Social Media Meta Tags -->
