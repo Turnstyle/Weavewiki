@@ -273,6 +273,7 @@ const App: React.FC = () => {
 
   const complexityTooltipText = difficulty && COMPLEXITY_LEVELS[difficulty]
     ? `AI-estimated reading complexity for this topic — ${difficulty}: ${COMPLEXITY_LEVELS[difficulty]}`
+    // eslint-disable-next-line indent
     : "AI-estimated reading complexity for this topic.";
 
   // Conditional rendering based on validation state
@@ -287,12 +288,22 @@ const App: React.FC = () => {
 
   if (!isConfigValid) {
     return (
-      <div style={{ padding: '2rem', textAlign: 'center', maxWidth: '600px', margin: 'auto' }}>
-        <h1 style={{ color: '#ffab91', letterSpacing: '0.1em' }}>Configuration Error</h1>
-        <p style={{ marginTop: '1rem', color: '#e0e0e0', lineHeight: '1.6' }}>{configError}</p>
-        <p style={{ marginTop: '2rem', color: '#aaa', fontSize: '0.9em' }}>
-          This error usually means the application's API key has not been set up correctly by the administrator. Please try refreshing the page, or contact the site owner if the problem persists.
-        </p>
+      <div>
+        <SearchBar ref={searchInputRef} onSearch={() => {}} isLoading={true} />
+        <div style={{ textAlign: 'center', marginBottom: '2rem', marginTop: '1rem' }}>
+          <h1 style={{ letterSpacing: '0.2em', textTransform: 'uppercase' }}>
+            WEAVEWIKI
+          </h1>
+        </div>
+        <main>
+          <div className="component-error main-error" style={{ textAlign: 'left', padding: '2rem', maxWidth: '600px', margin: 'auto' }}>
+            <h2 style={{ color: '#ffab91', marginBottom: '1rem', fontSize: '1.2em' }}>Configuration Error</h2>
+            <p style={{ color: '#e0e0e0', lineHeight: '1.6' }}>{configError}</p>
+            <p style={{ marginTop: '1.5rem', color: '#aaa', fontSize: '0.9em' }}>
+              Once the configuration is corrected, please refresh the page to continue.
+            </p>
+          </div>
+        </main>
       </div>
     );
   }

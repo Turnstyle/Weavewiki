@@ -250,7 +250,7 @@ export async function validateApiKey(): Promise<{isValid: boolean, error?: strin
         if (lowerCaseMessage.includes('api key') || 
             lowerCaseMessage.includes('permission denied') ||
             lowerCaseMessage.includes('authentication')) {
-            errorMessage = 'The application is not configured correctly. For administrators: please verify that the `API_KEY` environment variable is set correctly in your Cloud Run deployment settings and that the key is enabled for the Generative Language API.';
+            errorMessage = 'The AI service could not be reached. This is often due to a missing or invalid API key. Please ensure the API_KEY is set correctly in the project environment settings and is enabled for the Generative AI API.';
         }
     }
     return { isValid: false, error: errorMessage };
