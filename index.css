@@ -12,7 +12,7 @@
 body {
   background-color: #121212; /* Dark background */
   color: #e0e0e0; /* Light text */
-  font-family: 'Kosugi', sans-serif;
+  font-family: sans-serif;
   font-size: var(--base-font-size);
   line-height: var(--line-height);
   letter-spacing: var(--letter-spacing);
