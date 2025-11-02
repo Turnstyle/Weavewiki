@@ -19,9 +19,12 @@ export default defineConfig(() => {
     build: {
       outDir: 'dist',
     },
-    // The 'define' block was removed from here. The application should
-    // now correctly use the process.env.API_KEY provided by the
-    // AI Studio / Cloud Run runtime environment, rather than a
-    // hardcoded value from the build environment.
+    // This `define` block is crucial. It tells Vite to find `process.env.API_KEY`
+    // in the code and replace it with the actual value of the API_KEY from the
+    // build environment. Google Cloud Run makes this variable available during
+    // the build step.
+    define: {
+      'process.env.API_KEY': JSON.stringify(process.env.API_KEY),
+    },
   };
 });
