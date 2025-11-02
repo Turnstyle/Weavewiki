@@ -58,6 +58,7 @@ const COMPLEXITY_LEVELS: Record<string, string> = {
 };
 
 type ComponentErrorState = Record<string, string | null>;
+type AppStatus = 'VALIDATING' | 'READY' | 'ERROR';
 
 const App: React.FC = () => {
   const initialHistory = getInitialHistory();
@@ -81,25 +82,25 @@ const App: React.FC = () => {
   const [animatedArt, setAnimatedArt] = useState<AnimatedAsciiArtData | null>(null);
   
   // State for API key validation
-  const [isConfigValid, setIsConfigValid] = useState<boolean | null>(null);
+  const [appStatus, setAppStatus] = useState<AppStatus>('VALIDATING');
   const [configError, setConfigError] = useState<string | null>(null);
   
   const currentTopic = history[historyIndex] ?? 'Metacognition';
   
-  // This useEffect was the source of the crash and has been removed.
-  // The logic is now handled inside the AppControls component's share button.
-  
-  // New Effect for API key validation on initial load
+  // Effect for API key validation on initial load
   useEffect(() => {
     const checkConfig = async () => {
+      setAppStatus('VALIDATING');
       const { isValid, error } = await validateApiKey();
-      if (!isValid && error) {
-        setConfigError(error);
+      if (isValid) {
+        setAppStatus('READY');
+      } else {
+        setConfigError(error || 'An unknown configuration error occurred.');
+        setAppStatus('ERROR');
       }
-      setIsConfigValid(isValid);
     };
     checkConfig();
-  }, []); // Empty dependency array ensures this runs only once on mount.
+  }, []);
 
 
   const setVisualDensity = useCallback((density: number) => {
@@ -122,8 +123,7 @@ const App: React.FC = () => {
   }, [history, historyIndex, currentTopic]);
 
   useEffect(() => {
-    // Do not run if the config is invalid or still being checked
-    if (isConfigValid !== true || !currentTopic) return;
+    if (appStatus !== 'READY' || !currentTopic) return;
     
     document.title = `${currentTopic} - Weavewiki`;
     let isCancelled = false;
@@ -141,15 +141,12 @@ const App: React.FC = () => {
       setAnimatedArt(null);
       setTranslatedContent(null);
       setCurrentLanguage('en');
-      setComponentErrors({}); // Reset all component errors
+      setComponentErrors({});
       
       await new Promise(resolve => setTimeout(resolve, 300));
       if (isCancelled) return;
       setIsFading(false);
 
-      // --- Robust Auxiliary Data Fetching ---
-      // Promise.allSettled allows all promises to complete, regardless of individual failures.
-      // This makes the UI resilient: one failed component won't prevent others from loading.
       const settledPromises = await Promise.allSettled([
         generateAsciiArt(currentTopic),
         getRelatedTopics(currentTopic),
@@ -161,7 +158,6 @@ const App: React.FC = () => {
 
       const [asciiResult, relatedResult, factResult, animatedResult] = settledPromises;
 
-      // Process results, setting state for successes and componentErrors for failures.
       if (asciiResult.status === 'fulfilled') setAsciiArt(asciiResult.value);
       else setComponentErrors(prev => ({ ...prev, asciiArt: asciiResult.reason.message }));
 
@@ -174,7 +170,6 @@ const App: React.FC = () => {
       if (animatedResult.status === 'fulfilled') setAnimatedArt(animatedResult.value);
       else setComponentErrors(prev => ({ ...prev, animatedArt: animatedResult.reason.message }));
 
-      // --- Main Content Streaming ---
       try {
         let accumulatedContent = '';
         for await (const chunk of streamDefinition(currentTopic)) {
@@ -185,7 +180,7 @@ const App: React.FC = () => {
         if (!isCancelled && accumulatedContent) {
            rateDifficulty(accumulatedContent)
             .then(d => !isCancelled && setDifficulty(d))
-            .catch(err => console.error("Difficulty rating failed:", err)); // Non-critical, so we don't set a component error
+            .catch(err => console.error("Difficulty rating failed:", err));
         }
       } catch (e: unknown) {
         if (!isCancelled) {
@@ -201,7 +196,7 @@ const App: React.FC = () => {
 
     fetchContentAndArt();
     return () => { isCancelled = true; };
-  }, [currentTopic, isConfigValid]);
+  }, [currentTopic, appStatus]);
 
   const handleTranslate = useCallback(async (language: string) => {
     if (!content || isLoading) return;
@@ -236,9 +231,6 @@ const App: React.FC = () => {
   }, []);
 
   const WordCloudView = () => {
-    // Fix: Correctly typed the accumulator in the reduce function by passing a generic
-    // type argument to .reduce(). This strongly types the accumulator and the final
-    // result, ensuring `topicFrequencies` is correctly inferred as `Record<string, number>`.
     const topicFrequencies = history.reduce<Record<string, number>>((acc, topic) => {
       const cleanTopic = topic.trim().toLowerCase();
       if (cleanTopic) {
@@ -273,20 +265,18 @@ const App: React.FC = () => {
 
   const complexityTooltipText = difficulty && COMPLEXITY_LEVELS[difficulty]
     ? `AI-estimated reading complexity for this topic — ${difficulty}: ${COMPLEXITY_LEVELS[difficulty]}`
-    // eslint-disable-next-line indent
     : "AI-estimated reading complexity for this topic.";
 
-  // Conditional rendering based on validation state
-  if (isConfigValid === null) {
+  if (appStatus === 'VALIDATING') {
     return (
       <div style={{ padding: '2rem', textAlign: 'center', minHeight: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
         <h1 style={{ letterSpacing: '0.2em', textTransform: 'uppercase' }}>WEAVEWIKI</h1>
-        <p style={{ color: '#aaa' }}>Validating connection to AI service...</p>
+        <p style={{ color: '#aaa' }}>Validating Configuration & AI Service Connection...</p>
       </div>
     );
   }
 
-  if (!isConfigValid) {
+  if (appStatus === 'ERROR') {
     return (
       <div>
         <SearchBar ref={searchInputRef} onSearch={() => {}} isLoading={true} />
