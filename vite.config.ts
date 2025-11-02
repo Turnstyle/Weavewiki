@@ -3,19 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 
-import { defineConfig, loadEnv } from 'vite';
+import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => {
-  // Load environment variables from .env files based on the current mode.
-  // The third argument '' ensures all variables are loaded, not just those with VITE_ prefix.
-  const env = loadEnv(mode, process.cwd(), '');
-
-  // Determine the correct API key. Prioritize API_KEY (used by AI Studio)
-  // and fall back to GEMINI_API_KEY (for local development).
-  const apiKey = env.API_KEY ?? env.GEMINI_API_KEY ?? '';
-
+export default defineConfig(() => {
   return {
     plugins: [react()],
     // Vite options tailored for deployment within AI Studio
@@ -27,12 +19,9 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: 'dist',
     },
-    define: {
-      // This is the core of the fix. It replaces `process.env.API_KEY`
-      // in the source code with the actual value from the build environment.
-      // It also defines GEMINI_API_KEY for consistency, as requested.
-      'process.env.API_KEY': JSON.stringify(apiKey),
-      'process.env.GEMINI_API_KEY': JSON.stringify(apiKey),
-    },
+    // The 'define' block was removed from here. The application should
+    // now correctly use the process.env.API_KEY provided by the
+    // AI Studio / Cloud Run runtime environment, rather than a
+    // hardcoded value from the build environment.
   };
 });
