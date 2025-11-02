@@ -5,11 +5,25 @@
 
 import {GoogleGenAI, Type} from '@google/genai';
 
-// In a client-side browser environment proxied by a service like aistudio/applet-proxy,
-// the API key is injected by the proxy on the server-side. However, the GenAI SDK
-// requires a non-empty API key string in its constructor for client-side validation.
-// We provide a placeholder value which will be replaced by the proxy.
-const ai = new GoogleGenAI({apiKey: 'placeholder'});
+let ai: GoogleGenAI | null = null;
+
+/**
+ * Lazily initializes and returns the GoogleGenAI client.
+ * This prevents a fatal error on startup if the constructor fails
+ * (e.g., due to a stricter SDK validation on the placeholder API key).
+ * Errors in initialization will be caught by the calling function's try/catch block.
+ */
+function getAiClient(): GoogleGenAI {
+  if (!ai) {
+    // In a client-side browser environment proxied by a service like aistudio/applet-proxy,
+    // the API key is injected by the proxy on the server-side. However, the GenAI SDK
+    // requires a non-empty API key string in its constructor for client-side validation.
+    // We provide a placeholder value which will be replaced by the proxy.
+    ai = new GoogleGenAI({apiKey: 'placeholder'});
+  }
+  return ai;
+}
+
 
 const artModelName = 'gemini-2.5-flash';
 const textModelName = 'gemini-flash-lite-latest';
@@ -28,7 +42,8 @@ export async function* streamDefinition(
   const prompt = `Provide a concise, single-paragraph encyclopedia-style definition for the term: "${topic}". Be informative and neutral. Do not use markdown, titles, or any special formatting. Respond with only the text of the definition itself.`;
 
   try {
-    const response = await ai.models.generateContentStream({
+    const client = getAiClient();
+    const response = await client.models.generateContentStream({
       model: textModelName,
       contents: prompt,
       config: { thinkingConfig: { thinkingBudget: 0 } },
@@ -51,7 +66,8 @@ export async function generateAsciiArt(topic: string): Promise<AsciiArtData> {
   const prompt = `Generate an ASCII art visualization for the topic "${topic}". The visualization's form should embody the word's essence. Use this character palette: │─┌┐└┘├┤┬┴┼►◄▲▼○●◐◑░▒▓█▀▄■□▪▫★☆♦♠♣♥⟨⟩/\\_|.`;
 
   try {
-    const response = await ai.models.generateContent({
+    const client = getAiClient();
+    const response = await client.models.generateContent({
       model: artModelName,
       contents: prompt,
       config: {
@@ -86,7 +102,8 @@ export async function generateAnimatedAsciiArt(topic: string): Promise<AnimatedA
     const prompt = `Generate a 3-frame ASCII art animation about "${topic}". Use this character palette: │─┌┐└┘├┤┬┴┼►◄▲▼○●◐◑░▒▓█▀▄■□▪▫★☆♦♠♣♥⟨⟩/\\_|.`;
   
   try {
-    const response = await ai.models.generateContent({
+    const client = getAiClient();
+    const response = await client.models.generateContent({
       model: artModelName,
       contents: prompt,
       config: {
@@ -124,7 +141,8 @@ export async function getRelatedTopics(topic: string): Promise<string[]> {
   const prompt = `Given the topic "${topic}", suggest 4 tangentially related but interesting concepts for further exploration. For example, for 'Photosynthesis', you might return ["Chlorophyll", "Cellular Respiration", "Carbon Cycle", "Stomata"].`;
 
   try {
-    const response = await ai.models.generateContent({
+    const client = getAiClient();
+    const response = await client.models.generateContent({
       model: textModelName,
       contents: prompt,
       config: {
@@ -158,7 +176,8 @@ Respond with ONLY the chosen rating string.
 Text: "${text}"`;
 
   try {
-    const response = await ai.models.generateContent({
+    const client = getAiClient();
+    const response = await client.models.generateContent({
       model: textModelName,
       contents: prompt,
       config: { thinkingConfig: { thinkingBudget: 0 } },
@@ -178,7 +197,8 @@ Example response: "On this day, July 20, 1969, Apollo 11's lunar module landed o
 Only respond with the sentence or "NO_EVENT".`;
   
   try {
-    const response = await ai.models.generateContent({
+    const client = getAiClient();
+    const response = await client.models.generateContent({
       model: textModelName,
       contents: prompt,
       config: { thinkingConfig: { thinkingBudget: 0 } },
@@ -199,7 +219,8 @@ Return only the translated text, with no additional commentary or formatting.
 Text: "${text}"`;
   
   try {
-    const response = await ai.models.generateContent({
+    const client = getAiClient();
+    const response = await client.models.generateContent({
       model: textModelName,
       contents: prompt,
       config: { thinkingConfig: { thinkingBudget: 0 } },
@@ -213,9 +234,10 @@ Text: "${text}"`;
 
 export async function validateApiKey(): Promise<{isValid: boolean, error?: string}> {
   try {
+    const client = getAiClient();
     // Perform a lightweight, inexpensive API call to verify the key is being
     // injected correctly by the Cloud Run proxy.
-    await ai.models.generateContent({
+    await client.models.generateContent({
         model: textModelName,
         contents: 'test',
         config: { maxOutputTokens: 1 } // Ensure minimal processing
