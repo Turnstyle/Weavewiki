@@ -13,9 +13,9 @@ let ai: GoogleGenAI | null = null;
  * Errors in initialization will be caught by the calling function's try/catch block.
  */
 function getAiClient(): GoogleGenAI {
-  if (!process.env.API_KEY) {
-    // This error will be caught by `validateApiKey` and converted to a
-    // user-friendly message.
+  // Vite replaces process.env.API_KEY with its value at build time.
+  // If the build environment variable is missing, the value will often be the literal string "undefined".
+  if (!process.env.API_KEY || process.env.API_KEY === 'undefined') {
     throw new Error('API_KEY_MISSING_AT_BUILD');
   }
   if (!ai) {
@@ -251,7 +251,7 @@ export async function validateApiKey(): Promise<{isValid: boolean, error?: strin
     let errorMessage = 'Could not connect to the AI service. The service may be temporarily unavailable.';
     if (error instanceof Error) {
         if (error.message.includes('API_KEY_MISSING_AT_BUILD')) {
-            errorMessage = 'The application was built without an API key.\n\nThe `API_KEY` environment variable must be available during the build process. If you are deploying this application, please check your hosting provider\'s settings to ensure the key is set as a build-time environment variable.';
+            errorMessage = 'The application was built without an API key.\n\nYour application requires the `API_KEY` to be available during the build process, but it was not found. If you are deploying this application, please configure the key as a **build-time environment variable** in your hosting provider\'s settings, not as a runtime variable.';
         } else {
             const lowerCaseMessage = error.message.toLowerCase();
             if (lowerCaseMessage.includes('api key') || 
