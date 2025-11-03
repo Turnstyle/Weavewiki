@@ -2,8 +2,9 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
-
-import { defineConfig } from 'vite';
+// Fix: Reference vitest/config and import defineConfig from vitest/config to correctly type the test configuration.
+/// <reference types="vitest/config" />
+import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 
 // https://vitejs.dev/config/
@@ -12,11 +13,14 @@ export default defineConfig({
   build: {
     outDir: 'dist',
   },
-  // This `define` block is crucial. It tells Vite to find `process.env.API_KEY`
-  // in the code and replace it with the actual value of the API_KEY from the
-  // build environment. Google Cloud Run makes this variable available during
-  // the build step.
-  define: {
-    'process.env.API_KEY': JSON.stringify(process.env.API_KEY),
+  // The API key is now handled by the backend server.
+  // The client-side code will make requests to our server,
+  // which will then securely call the Google Gemini API.
+  // Therefore, we no longer need to inject the API key here.
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: './tests/setup.ts',
+    css: true,
   },
 });

@@ -3,30 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 
-import {GoogleGenAI, Type} from '@google/genai';
+import { Type, GenerateContentResponse } from '@google/genai';
 
-let ai: GoogleGenAI | null = null;
-
-/**
- * Lazily initializes and returns the GoogleGenAI client.
- * This prevents a fatal error on startup if the constructor fails.
- * Errors in initialization will be caught by the calling function's try/catch block.
- */
-function getAiClient(): GoogleGenAI {
-  // Vite replaces process.env.API_KEY with its value at build time.
-  // If the build environment variable is missing, the value will often be the literal string "undefined".
-  if (!process.env.API_KEY || process.env.API_KEY === 'undefined') {
-    throw new Error('API_KEY_MISSING_AT_BUILD');
-  }
-  if (!ai) {
-    // The API key is injected by the AI Studio environment and is accessible
-    // via process.env.API_KEY. This is the standard and secure way to
-    // access the key in this proxied, client-side environment.
-    ai = new GoogleGenAI({apiKey: process.env.API_KEY});
-  }
-  return ai;
-}
-
+// API calls are now proxied through our own server to protect the API key.
+const PROXY_ENDPOINT = '/api/generate';
 
 const artModelName = 'gemini-2.5-flash';
 const textModelName = 'gemini-flash-lite-latest';
@@ -39,27 +19,58 @@ export interface AnimatedAsciiArtData {
   frames: string[];
 }
 
+async function postToProxy<T>(body: object): Promise<T> {
+  const response = await fetch(PROXY_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({ error: 'An unknown server error occurred.' }));
+    throw new Error(errorBody.error || `Server responded with status ${response.status}`);
+  }
+  
+  const fullResponse: GenerateContentResponse = await response.json();
+  const text = fullResponse.text;
+  if (!text) throw new Error('API returned an empty response.');
+  return JSON.parse(text) as T;
+}
+
 export async function* streamDefinition(
   topic: string,
 ): AsyncGenerator<string, void, undefined> {
   const prompt = `Provide a concise, single-paragraph encyclopedia-style definition for the term: "${topic}". Be informative and neutral. Do not use markdown, titles, or any special formatting. Respond with only the text of the definition itself.`;
-
+  
   try {
-    const client = getAiClient();
-    const response = await client.models.generateContentStream({
-      model: textModelName,
-      contents: prompt,
-      config: { thinkingConfig: { thinkingBudget: 0 } },
+    const response = await fetch(PROXY_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        stream: true,
+        model: textModelName,
+        contents: prompt,
+        config: { thinkingConfig: { thinkingBudget: 0 } },
+      }),
     });
 
-    for await (const chunk of response) {
-      if (chunk.text) {
-        yield chunk.text;
-      }
+    if (!response.ok || !response.body) {
+      const errorBody = await response.json().catch(() => ({ error: 'An unknown server error occurred.' }));
+      throw new Error(errorBody.error || `Server responded with status ${response.status}`);
     }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      yield decoder.decode(value, { stream: true });
+    }
+
   } catch (error) {
-    console.error('Error streaming from Gemini:', error);
     const errorMessage = `Could not generate content for "${topic}".`;
+    console.error('Error streaming from proxy:', error);
     yield `Error: ${errorMessage}`;
     throw new Error(errorMessage);
   }
@@ -67,10 +78,8 @@ export async function* streamDefinition(
 
 export async function generateAsciiArt(topic: string): Promise<AsciiArtData> {
   const prompt = `Generate an ASCII art visualization for the topic "${topic}". The visualization's form should embody the word's essence. Use this character palette: │─┌┐└┘├┤┬┴┼►◄▲▼○●◐◑░▒▓█▀▄■□▪▫★☆♦♠♣♥⟨⟩/\\_|.`;
-
   try {
-    const client = getAiClient();
-    const response = await client.models.generateContent({
+    return await postToProxy<AsciiArtData>({
       model: artModelName,
       contents: prompt,
       config: {
@@ -78,23 +87,11 @@ export async function generateAsciiArt(topic: string): Promise<AsciiArtData> {
         thinkingConfig: { thinkingBudget: 0 },
         responseSchema: {
           type: Type.OBJECT,
-          properties: {
-            art: {
-              type: Type.STRING,
-              description: 'A string containing the ASCII art visualization.'
-            }
-          },
+          properties: { art: { type: Type.STRING, description: 'A string containing the ASCII art visualization.' } },
           required: ['art']
         }
       },
     });
-    const text = response.text.trim();
-    if (!text) throw new Error('API returned an empty response.');
-    const parsedData = JSON.parse(text);
-    if (typeof parsedData?.art !== 'string' || parsedData.art.trim().length === 0) {
-      throw new Error('Invalid or empty ASCII art in response');
-    }
-    return parsedData as AsciiArtData;
   } catch (error) {
     console.error(`Could not generate ASCII art for "${topic}":`, error);
     throw new Error('Could not load art.');
@@ -103,10 +100,8 @@ export async function generateAsciiArt(topic: string): Promise<AsciiArtData> {
 
 export async function generateAnimatedAsciiArt(topic: string): Promise<AnimatedAsciiArtData> {
     const prompt = `Generate a 3-frame ASCII art animation about "${topic}". Use this character palette: │─┌┐└┘├┤┬┴┼►◄▲▼○●◐◑░▒▓█▀▄■□▪▫★☆♦♠♣♥⟨⟩/\\_|.`;
-  
   try {
-    const client = getAiClient();
-    const response = await client.models.generateContent({
+    return await postToProxy<AnimatedAsciiArtData>({
       model: artModelName,
       contents: prompt,
       config: {
@@ -127,13 +122,6 @@ export async function generateAnimatedAsciiArt(topic: string): Promise<AnimatedA
         }
       },
     });
-    const text = response.text.trim();
-    if (!text) throw new Error('API returned an empty response.');
-    const parsedData = JSON.parse(text);
-    if (!Array.isArray(parsedData?.frames) || parsedData.frames.length === 0 || !parsedData.frames.every((f: unknown) => typeof f === 'string')) {
-      throw new Error('Invalid or empty frames array in response');
-    }
-    return parsedData as AnimatedAsciiArtData;
   } catch (error) {
     console.error(`Could not generate animated ASCII art for "${topic}":`, error);
     throw new Error('Could not load animation.');
@@ -144,8 +132,7 @@ export async function getRelatedTopics(topic: string): Promise<string[]> {
   const prompt = `Given the topic "${topic}", suggest 4 tangentially related but interesting concepts for further exploration. For example, for 'Photosynthesis', you might return ["Chlorophyll", "Cellular Respiration", "Carbon Cycle", "Stomata"].`;
 
   try {
-    const client = getAiClient();
-    const response = await client.models.generateContent({
+    const topics = await postToProxy<string[]>({
       model: textModelName,
       contents: prompt,
       config: {
@@ -160,13 +147,7 @@ export async function getRelatedTopics(topic: string): Promise<string[]> {
         }
       },
     });
-    const text = response.text.trim();
-    if (!text) throw new Error('API returned an empty response.');
-    const parsedData = JSON.parse(text);
-    if (!Array.isArray(parsedData) || !parsedData.every((t: unknown) => typeof t === 'string')) {
-      throw new Error('Response was not a JSON array of strings.');
-    }
-    return (parsedData as string[]).slice(0, 4);
+    return (topics as string[]).slice(0, 4);
   } catch (error) {
     console.error(`Could not get related topics for "${topic}":`, error);
     throw new Error('Could not load related topics.');
@@ -179,13 +160,18 @@ Respond with ONLY the chosen rating string.
 Text: "${text}"`;
 
   try {
-    const client = getAiClient();
-    const response = await client.models.generateContent({
-      model: textModelName,
-      contents: prompt,
-      config: { thinkingConfig: { thinkingBudget: 0 } },
+    const response = await fetch(PROXY_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: textModelName,
+        contents: prompt,
+        config: { thinkingConfig: { thinkingBudget: 0 } },
+      }),
     });
-    return response.text.trim();
+    if (!response.ok) throw new Error('Server error rating difficulty');
+    const fullResponse: GenerateContentResponse = await response.json();
+    return fullResponse.text.trim();
   } catch (error) {
     console.error('Could not rate difficulty:', error);
     throw new Error('Could not rate difficulty.');
@@ -200,13 +186,18 @@ Example response: "On this day, July 20, 1969, Apollo 11's lunar module landed o
 Only respond with the sentence or "NO_EVENT".`;
   
   try {
-    const client = getAiClient();
-    const response = await client.models.generateContent({
-      model: textModelName,
-      contents: prompt,
-      config: { thinkingConfig: { thinkingBudget: 0 } },
+    const response = await fetch(PROXY_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: textModelName,
+        contents: prompt,
+        config: { thinkingConfig: { thinkingBudget: 0 } },
+      }),
     });
-    const fact = response.text.trim();
+    if (!response.ok) throw new Error('Server error getting historical fact');
+    const fullResponse: GenerateContentResponse = await response.json();
+    const fact = fullResponse.text.trim();
     return fact === 'NO_EVENT' ? null : fact;
   } catch (error) {
     console.error(`Could not get historical fact for "${topic}":`, error);
@@ -222,13 +213,18 @@ Return only the translated text, with no additional commentary or formatting.
 Text: "${text}"`;
   
   try {
-    const client = getAiClient();
-    const response = await client.models.generateContent({
-      model: textModelName,
-      contents: prompt,
-      config: { thinkingConfig: { thinkingBudget: 0 } },
+    const response = await fetch(PROXY_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: textModelName,
+        contents: prompt,
+        config: { thinkingConfig: { thinkingBudget: 0 } },
+      }),
     });
-    return response.text.trim();
+    if (!response.ok) throw new Error('Server error translating text');
+    const fullResponse: GenerateContentResponse = await response.json();
+    return fullResponse.text.trim();
   } catch (error) {
     console.error(`Could not translate text to ${targetLanguage}:`, error);
     throw new Error('Could not translate text.');
@@ -237,29 +233,29 @@ Text: "${text}"`;
 
 export async function validateApiKey(): Promise<{isValid: boolean, error?: string}> {
   try {
-    const client = getAiClient();
-    // Perform a lightweight, inexpensive API call to verify the key is valid
-    // and was injected correctly by the build process.
-    await client.models.generateContent({
-        model: textModelName,
-        contents: 'test',
-        config: { maxOutputTokens: 1 } // Ensure minimal processing
+    // This now tests connectivity to our own server, which in turn
+    // is responsible for having the API key.
+    const response = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            model: textModelName,
+            contents: 'test',
+            config: { maxOutputTokens: 1 }
+        })
     });
+
+    if (!response.ok) {
+        const errorBody = await response.json().catch(() => ({ error: 'Could not connect to the backend service.' }));
+        throw new Error(errorBody.error);
+    }
+
     return { isValid: true };
   } catch (error) {
-    console.error("API Key validation failed:", error);
-    let errorMessage = 'Could not connect to the AI service. The service may be temporarily unavailable.';
-    if (error instanceof Error) {
-        if (error.message.includes('API_KEY_MISSING_AT_BUILD')) {
-            errorMessage = 'The application was built without an API key.\n\nYour application requires the `API_KEY` to be available during the build process, but it was not found. If you are deploying this application, please configure the key as a **build-time environment variable** in your hosting provider\'s settings, not as a runtime variable.';
-        } else {
-            const lowerCaseMessage = error.message.toLowerCase();
-            if (lowerCaseMessage.includes('api key') || 
-                lowerCaseMessage.includes('permission denied') ||
-                lowerCaseMessage.includes('authentication')) {
-                errorMessage = 'The provided API key is invalid or lacks the necessary permissions.\n\nPlease verify the key in your project\'s build environment settings and ensure the Generative AI API is enabled in your cloud project.';
-            }
-        }
+    console.error("Backend service validation failed:", error);
+    let errorMessage = 'Could not connect to the Weavewiki backend service. Please check your network connection or try again later.';
+    if (error instanceof Error && error.message.includes('API key is not configured')) {
+        errorMessage = 'Configuration Error: The server is missing its API key.\n\nPlease contact the site administrator. The `API_KEY` must be set as a runtime environment variable in the hosting environment.';
     }
     return { isValid: false, error: errorMessage };
   }
