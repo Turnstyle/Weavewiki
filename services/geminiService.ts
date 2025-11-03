@@ -13,6 +13,11 @@ let ai: GoogleGenAI | null = null;
  * Errors in initialization will be caught by the calling function's try/catch block.
  */
 function getAiClient(): GoogleGenAI {
+  if (!process.env.API_KEY) {
+    // This error will be caught by `validateApiKey` and converted to a
+    // user-friendly message.
+    throw new Error('API_KEY_MISSING_AT_BUILD');
+  }
   if (!ai) {
     // The API key is injected by the AI Studio environment and is accessible
     // via process.env.API_KEY. This is the standard and secure way to
@@ -233,8 +238,8 @@ Text: "${text}"`;
 export async function validateApiKey(): Promise<{isValid: boolean, error?: string}> {
   try {
     const client = getAiClient();
-    // Perform a lightweight, inexpensive API call to verify the key is being
-    // injected correctly by the Cloud Run proxy.
+    // Perform a lightweight, inexpensive API call to verify the key is valid
+    // and was injected correctly by the build process.
     await client.models.generateContent({
         model: textModelName,
         contents: 'test',
@@ -245,12 +250,15 @@ export async function validateApiKey(): Promise<{isValid: boolean, error?: strin
     console.error("API Key validation failed:", error);
     let errorMessage = 'Could not connect to the AI service. The service may be temporarily unavailable.';
     if (error instanceof Error) {
-        const lowerCaseMessage = error.message.toLowerCase();
-        // Check for specific error messages that indicate a configuration problem.
-        if (lowerCaseMessage.includes('api key') || 
-            lowerCaseMessage.includes('permission denied') ||
-            lowerCaseMessage.includes('authentication')) {
-            errorMessage = 'The AI service could not be reached. This is often due to a missing or invalid API key. Please ensure the API_KEY is set correctly in the project environment settings and is enabled for the Generative AI API.';
+        if (error.message.includes('API_KEY_MISSING_AT_BUILD')) {
+            errorMessage = 'The application was built without an API key.\n\nThe `API_KEY` environment variable must be available during the build process. If you are deploying this application, please check your hosting provider\'s settings to ensure the key is set as a build-time environment variable.';
+        } else {
+            const lowerCaseMessage = error.message.toLowerCase();
+            if (lowerCaseMessage.includes('api key') || 
+                lowerCaseMessage.includes('permission denied') ||
+                lowerCaseMessage.includes('authentication')) {
+                errorMessage = 'The provided API key is invalid or lacks the necessary permissions.\n\nPlease verify the key in your project\'s build environment settings and ensure the Generative AI API is enabled in your cloud project.';
+            }
         }
     }
     return { isValid: false, error: errorMessage };

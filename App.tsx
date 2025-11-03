@@ -288,9 +288,13 @@ const App: React.FC = () => {
         <main>
           <div className="component-error main-error" style={{ textAlign: 'left', padding: '2rem', maxWidth: '600px', margin: 'auto' }}>
             <h2 style={{ color: '#ffab91', marginBottom: '1rem', fontSize: '1.2em' }}>Configuration Error</h2>
-            <p style={{ color: '#e0e0e0', lineHeight: '1.6' }}>{configError}</p>
+            {configError?.split('\n\n').map((paragraph, index) => (
+              <p key={index} style={{ color: '#e0e0e0', lineHeight: '1.6', margin: '0 0 1em 0' }}>
+                {paragraph}
+              </p>
+            ))}
             <p style={{ marginTop: '1.5rem', color: '#aaa', fontSize: '0.9em' }}>
-              Once the configuration is corrected, please refresh the page to continue.
+              Once the configuration is corrected, you may need to rebuild and redeploy the application. A hard refresh of this page should then resolve the issue.
             </p>
           </div>
         </main>
